@@ -11,12 +11,17 @@ dependencies = [
     "sqlalchemy>=2.0.36",
     "alembic>=1.14",
     "cryptography>=43",
+    "httpx>=0.28",
+    # LLM: Anthropic은 공식 SDK, 그 외 제공사는 REST(httpx)로 호출
+    "anthropic>=2.8",
+    # 사용자 DB 드라이버 (순수 Python: 휠이 없는 Python 버전에서도 설치 가능)
+    "pg8000>=1.31",
+    "pymysql>=1.1",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.28",
     "ruff>=0.8",
 ]
 

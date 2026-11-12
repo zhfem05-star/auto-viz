@@ -1,74 +1,50 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { routes } from './routes'
+import { installFakeApi } from '@/test/fakeApi'
+import { renderApp } from '@/test/render'
 
-function renderAt(path: string) {
-  const router = createMemoryRouter(routes, { initialEntries: [path] })
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  )
-}
+const healthBody = (overrides: Partial<{ status: string; version: string; database: string }> = {}) =>
+  Response.json({ status: 'ok', version: '1.2.3', database: 'ok', ...overrides })
 
-/**
- * /api/health 요청에만 지정한 응답을 돌려주는 fetch mock.
- * 다른 URL이 호출되면 실패시켜, 엉뚱한 엔드포인트를 호출해도 통과하는 일을 막는다.
- */
-function mockHealth(result: Response | Error) {
-  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-    const url = new URL(input instanceof Request ? input.url : String(input))
-    if (url.origin !== window.location.origin || url.pathname !== '/api/health') {
-      throw new Error(`예상하지 못한 요청: ${url.href}`)
-    }
-    if (result instanceof Error) throw result
-    return result.clone()
-  })
-}
-
-function healthBody(overrides: Partial<{ status: string; version: string; database: string }> = {}) {
-  return Response.json({ status: 'ok', version: '1.2.3', database: 'ok', ...overrides })
-}
+const healthCalls = (api: ReturnType<typeof installFakeApi>) =>
+  api.requests.filter((r) => r.path === '/api/health').length
 
 describe('API 상태 표시', () => {
   it('정상 응답이면 연결됨과 서버 버전을 표시한다', async () => {
-    const fetchSpy = mockHealth(healthBody({ version: '1.2.3' }))
-    renderAt('/')
+    const api = installFakeApi({ health: () => healthBody({ version: '1.2.3' }) })
+    renderApp('/')
 
     expect(screen.getByRole('heading', { name: 'auto-viz' })).toBeInTheDocument()
     expect(await screen.findByText('API 연결됨 · v1.2.3')).toBeInTheDocument()
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(healthCalls(api)).toBe(1)
   })
 
   it('서버가 degraded를 보고하면 연결 안 됨으로 표시한다', async () => {
-    const fetchSpy = mockHealth(healthBody({ status: 'degraded', database: 'error' }))
-    renderAt('/')
+    const api = installFakeApi({ health: () => healthBody({ status: 'degraded', database: 'error' }) })
+    renderApp('/')
 
     expect(await screen.findByText('API 연결 안 됨')).toBeInTheDocument()
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(healthCalls(api)).toBe(1)
   })
 
   it('네트워크 오류면 연결 안 됨으로 표시한다', async () => {
-    const fetchSpy = mockHealth(new TypeError('fetch failed'))
-    renderAt('/')
+    const api = installFakeApi({ health: () => new TypeError('fetch failed') })
+    renderApp('/')
 
     expect(await screen.findByText('API 연결 안 됨')).toBeInTheDocument()
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(healthCalls(api)).toBe(1)
   })
 
   it('HTTP 오류 응답(500)이면 연결 안 됨으로 표시한다', async () => {
-    mockHealth(new Response('boom', { status: 500 }))
-    renderAt('/')
+    installFakeApi({ health: () => new Response('boom', { status: 500 }) })
+    renderApp('/')
 
     expect(await screen.findByText('API 연결 안 됨')).toBeInTheDocument()
   })
 
   it('응답 전에는 확인 중으로 표시한다', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}))
-    renderAt('/')
+    renderApp('/')
 
     expect(screen.getByText('API 확인 중')).toBeInTheDocument()
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled())
@@ -76,25 +52,25 @@ describe('API 상태 표시', () => {
 })
 
 describe('라우팅', () => {
-  it('프로젝트 섹션 경로는 섹션 이름과 프로젝트 ID를 보여준다', () => {
-    mockHealth(healthBody())
-    renderAt('/projects/p-42/datasets')
+  it('프로젝트 섹션 경로는 섹션 이름과 프로젝트 이름을 보여준다', async () => {
+    installFakeApi({ projects: [{ id: 'p-42', name: '매출 분석' }] })
+    renderApp('/projects/p-42/datasets')
 
     expect(screen.getByRole('heading', { name: '데이터셋' })).toBeInTheDocument()
-    expect(screen.getByText('· p-42')).toBeInTheDocument()
+    expect(await screen.findByText('· 매출 분석')).toBeInTheDocument()
   })
 
   it('알 수 없는 섹션은 404를 보여준다', () => {
-    mockHealth(healthBody())
-    renderAt('/projects/p-42/unknown')
+    installFakeApi({ projects: [{ id: 'p-42' }] })
+    renderApp('/projects/p-42/unknown')
 
     expect(screen.getByText('페이지를 찾을 수 없습니다')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '데이터셋' })).not.toBeInTheDocument()
   })
 
   it('정의되지 않은 경로는 404를 보여준다', () => {
-    mockHealth(healthBody())
-    renderAt('/nope')
+    installFakeApi()
+    renderApp('/nope')
 
     expect(screen.getByText('페이지를 찾을 수 없습니다')).toBeInTheDocument()
   })

@@ -7,7 +7,8 @@ from app.models import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # 앱/테스트 로거를 끄지 않도록 disable_existing_loggers=False
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
