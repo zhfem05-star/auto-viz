@@ -1,7 +1,11 @@
 from functools import lru_cache
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 버전은 pyproject.toml 한 곳에서만 관리한다 (설치된 패키지 메타데이터에서 읽음).
+APP_VERSION = _pkg_version("auto-viz-backend")
 
 
 class Settings(BaseSettings):
@@ -10,7 +14,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AUTOVIZ_", env_file=".env", extra="ignore")
 
     app_name: str = "auto-viz"
-    version: str = "0.1.0"
     log_level: str = "INFO"
 
     # 앱 데이터 디렉터리 (메타 DB, 데이터셋, 마스터 키 파일)

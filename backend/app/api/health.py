@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.api.deps import DbSession
-from app.core.config import get_settings
+from app.core.config import APP_VERSION
 
 router = APIRouter(tags=["system"])
 
@@ -25,6 +25,6 @@ def health(db: DbSession) -> HealthResponse:
         database = "error"
     return HealthResponse(
         status="ok" if database == "ok" else "degraded",
-        version=get_settings().version,
+        version=APP_VERSION,
         database=database,
     )
