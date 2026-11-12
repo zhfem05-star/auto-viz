@@ -1,0 +1,28 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      AUTOVIZ_DATA_DIR: /data
+      AUTOVIZ_MASTER_KEY: ${AUTOVIZ_MASTER_KEY:-}
+      AUTOVIZ_LOG_LEVEL: ${AUTOVIZ_LOG_LEVEL:-INFO}
+    volumes:
+      - autoviz-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      # 단일 사용자 도구: 기본은 로컬에서만 접근
+      - "127.0.0.1:${AUTOVIZ_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  autoviz-data:

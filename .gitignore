@@ -10,6 +10,7 @@ dist/
 __pycache__/
 *.py[cod]
 .venv/
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
 
@@ -29,3 +30,6 @@ data/
 Thumbs.db
 .vscode/
 .idea/
+
+# Generated OpenAPI schema (regenerate with: npm run gen:api)
+frontend/openapi.json
